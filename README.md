@@ -21,7 +21,14 @@ marks are stored in `data/user.json`.
 | Start | Oct 2026 – Jan 2027 (ASAP / flexible OK) | Jan / Feb 2027 (flexible OK; Dec/Mar shown as "close") |
 | Degree | Bachelor's students accepted | Bachelor's students accepted |
 | Duration | – | At least 5 months (5 preferred, "5–6 months" etc. accepted) |
-| Location | Germany or Zurich area | Germany / Switzerland preferred, rest of Europe accepted |
+| Location | Germany or Zurich area | Germany / Switzerland preferred, rest of Europe accepted. Also Cairo, Egypt and Saudi Arabia (Jeddah preferred) |
+
+Egypt and Saudi Arabia apply to internships only:
+- **Egypt:** the Greater Cairo area (incl. New Cairo, Giza, 6th of October, Smart Village) is met; other Egyptian cities fail.
+- **Saudi Arabia:** Jeddah (incl. KAUST in Thuwal) is met, other Saudi cities are partial. Postings that are explicitly for Saudi nationals only (e.g. "Saudi nationals only", "must be Saudi", Tamheer-only roles) are excluded.
+- **Region filter:** "All of Europe" hides roles located only in Egypt or Saudi Arabia; use the "Egypt" or "Saudi Arabia" region filter to see them.
+
+Programmes open only to people with disabilities (e.g. Microsoft's Ignite internships in Cairo) are excluded everywhere. General equal-opportunity statements don't trigger this.
 
 Each criterion is checked separately. Select a posting in the list to see the results in the detail pane on the right, together with the text each result was based on and the full description. Each criterion is labelled:
 - **Met** or **Likely:** meets the criterion
@@ -50,17 +57,18 @@ The interface is based on the Figma file [Internship Grabber - UI](https://www.f
 
 | Source | Covers |
 |---|---|
-| Google Careers | Google internships and Student Researcher roles in Europe |
+| Google Careers | Google internships and Student Researcher roles in Europe, Egypt and Saudi Arabia |
 | Apple Jobs | Apple internships in 15 European countries, plus Werkstudent roles in Germany |
-| Amazon Jobs | Amazon / AWS in Germany, Switzerland and 15 other European countries |
+| Amazon Jobs | Amazon / AWS in Germany, Switzerland, 15 other European countries, Egypt and Saudi Arabia |
 | Microsoft & Qualcomm (Eightfold) | Microsoft and Qualcomm careers sites |
 | Workday | NVIDIA, Intel, Salesforce, Adobe, CrowdStrike, Mastercard, HP, Novartis, PayPal, Red Hat, Broadcom, BlackRock, Airbus, Thales, Philips, Roche, Sanofi, Visa, Autodesk, Workday |
 | Greenhouse / Lever / Ashby / Personio | ~94 tech companies, e.g. Stripe, Datadog, Databricks, Celonis, N26, Cohere, Perplexity, Anthropic… |
 | SmartRecruiters | Bosch, Continental, Delivery Hero, ServiceNow, SIXT, NielsenIQ |
-| Workable | Hugging Face |
+| Workable | Hugging Face, plus Foodics, Salla, Lucidya and Robusta (Cairo / Saudi Arabia) |
 | Bundesagentur für Arbeit | Germany's official job board. It covers nearly every German employer, including SAP, Siemens, BMW, Mercedes, Allianz, Telekom and Infineon. |
 | Arbeitnow | German tech job board |
 | jobs.ch | Zurich and Switzerland |
+| Wuzzuf | Egypt and Saudi Arabia internships, read from the JSON API that wuzzuf.net's own pages use (the HTML pages are behind a bot challenge) |
 
 To add a company, add its board slug to the matching list in `src/config.js`, for example `greenhouse: { slug: 'Name' }`
 or a Workday `{name, tenant, site, host}` entry. You can find the slug in the company's careers URL.
@@ -68,7 +76,7 @@ or a Workday `{name, tenant, site, host}` entry. You can find the slug in the co
 ## How it works
 
 1. **Collect.** Every 20 minutes, each source lists its postings.
-2. **Filter.** Postings that aren't internships or working-student roles are dropped, as are postings located only outside Europe.
+2. **Filter.** Postings that aren't internships or working-student roles are dropped, as are postings located only outside Europe, Egypt and Saudi Arabia.
 3. **Fetch details.** Full descriptions are fetched only for remaining candidates, and each description is downloaded once and cached.
 4. **Classify.** `src/classify.js` reads English and German text: start dates ("ab 01.02.2027", "starting January 2027", "Q1 2027"), durations ("5–6 Monate"), degree level and location.
 5. **Deduplicate.** The same posting found on several sources (e.g. on Bosch's ATS and on the Bundesagentur board) is merged into one entry.
@@ -88,6 +96,6 @@ The icon itself comes from Google's favicon service, with DuckDuckGo as a fallba
 ## Limitations
 
 - **SAP, Siemens and Meta** don't offer a public jobs API, so their postings come in through the Bundesagentur board (SAP and Siemens) or aren't covered (Meta).
-- **LinkedIn and Indeed** are deliberately not scraped because their terms of service don't allow it.
+- **LinkedIn and Indeed** are deliberately not scraped: LinkedIn's robots.txt prohibits automated access without permission, and Indeed's terms don't allow it. Instead, the "Search LinkedIn" link above the list opens the same search (tab, fields, region, posted date) on linkedin.com in your own browser.
 - **Rule-based classification:** the classifier uses rules, not a language model. When a posting doesn't state something, it is marked "?" instead of guessed.
-- **Google internships:** Google's 2027 European internships (checked October 2026) all require 13–17 weeks (about 3–4 months) starting in May, June or July 2027, so they are excluded under these criteria. Google's 26-week (6-month) internships starting March–May 2027 are only offered in Israel. The Google source also searches for "Student Researcher" roles, which usually have flexible start dates and durations, so those are picked up when Google posts them.
+- **Google internships:** Google's 2027 European internships (checked October 2026) all require 13–17 weeks (about 3–4 months) starting in May, June or July 2027. They are still listed, as "Possible" matches with start and duration marked as partial, so you can decide yourself. This is controlled by `criteria.internship.relaxTimingSources` in `src/config.js`. Google's 26-week (6-month) internships starting March–May 2027 are only offered in Israel. The Google source also searches for "Student Researcher" roles, which usually have flexible start dates and durations.

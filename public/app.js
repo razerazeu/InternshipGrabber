@@ -93,7 +93,7 @@ function renderCriteria(c) {
   const it = c.internship;
   $('#criteria').innerHTML = `
     <div data-for="working_student"><b>Working student</b> starting ${ws.startFrom} to ${ws.startTo}, open to bachelor's students, in Germany or Zurich.</div>
-    <div data-for="internship"><b>Internship</b> starting ${it.targetStartMonths.join(' or ')}, at least ${it.minMonths} months (${it.preferredMonths} preferred), open to bachelor's students. Germany or Switzerland first, rest of Europe accepted.</div>`;
+    <div data-for="internship"><b>Internship</b> starting ${it.targetStartMonths.join(' or ')}, at least ${it.minMonths} months (${it.preferredMonths} preferred), open to bachelor's students. Germany or Switzerland first, rest of Europe accepted. Also Cairo (Egypt) and Saudi Arabia (Jeddah preferred), excluding Saudi-nationals-only roles.</div>`;
 }
 
 // ------------------------------------------------------------ filtering
@@ -114,8 +114,11 @@ function filtered() {
         if (j.stale && !prefs.showStale) return false;
       }
       if (prefs.cats.length && !prefs.cats.some((c) => a.categories.includes(c))) return false;
-      if (prefs.region) {
-        const cs = a.countries || [];
+      const cs = a.countries || [];
+      if (!prefs.region) {
+        // "All of Europe" leaves out roles located only in Egypt / Saudi Arabia; they have their own filters.
+        if (prefs.tab !== 'saved' && cs.length && cs.every((c) => c === 'EG' || c === 'SA')) return false;
+      } else {
         if (prefs.region === 'zurich' && !a.zurich) return false;
         if (prefs.region === 'dach' && !cs.some((c) => c === 'DE' || c === 'CH')) return false;
         if (prefs.region.length === 2 && !cs.includes(prefs.region)) return false;
@@ -135,6 +138,23 @@ function filtered() {
 }
 
 // ------------------------------------------------------------ rendering
+// LinkedIn forbids automated access, so it is not a scanned source; this opens the same search on linkedin.com instead.
+const LI_FIELDS = { ml: '"machine learning"', ai: 'AI', security: '"cyber security"', swe: 'software' };
+const LI_REGION = { dach: 'Germany', DE: 'Germany', CH: 'Switzerland', zurich: 'Zurich, Switzerland', EG: 'Cairo, Egypt', SA: 'Saudi Arabia' };
+function linkedinUrl() {
+  const ws = prefs.tab === 'working_student';
+  const intern = prefs.tab === 'internship';
+  const role = ws ? '"working student" OR werkstudent' : intern ? 'intern OR internship' : 'intern OR internship OR "working student" OR werkstudent';
+  const fields = (prefs.cats.length ? prefs.cats : Object.keys(LI_FIELDS)).map((c) => LI_FIELDS[c]).filter(Boolean).join(' OR ');
+  const p = new URLSearchParams({
+    keywords: `(${role}) AND (${fields})`,
+    location: LI_REGION[prefs.region] || (ws ? 'Germany' : 'European Union'),
+  });
+  if (intern) p.set('f_JT', 'I');
+  if (prefs.posted) p.set('f_TPR', `r${Number(prefs.posted) * 86400}`);
+  return `https://www.linkedin.com/jobs/search/?${p}`;
+}
+
 function ago(iso, short = false) {
   if (!iso) return 'unknown';
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -160,6 +180,7 @@ function render() {
   const list = filtered();
   const newCount = list.filter(isNew).length;
   $('#summary').innerHTML = `${list.length} match${list.length === 1 ? '' : 'es'}${newCount ? ` <span class="sep">/</span> <span class="new">${newCount} new since your last visit</span>` : ''}`;
+  $('#linkedin').href = linkedinUrl();
   const prevIndex = state.shown.indexOf(state.sel);
   state.shown = list.slice(0, state.limit).map((j) => j.id);
   $('#list').innerHTML = list.slice(0, state.limit).map(row).join('') || `<div class="empty">No postings match these filters yet. New ones appear here automatically.</div>`;

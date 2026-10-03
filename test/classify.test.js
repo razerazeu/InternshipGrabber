@@ -149,3 +149,65 @@ test('Google careers wording', () => {
   assert.equal(extractDuration('Projects shipped in the last 3 months'), null);
   assert.equal(evaluateDegree('Student Researcher', 'Currently pursuing a BS in Computer Science or related field.').status, 'pass');
 });
+
+test('Google internships are listed with their own dates', () => {
+  const job = {
+    source: 'google',
+    title: 'Software Engineering, Site Reliability Engineering BS/MS Intern, 2027',
+    description: 'Currently pursuing a BS/MS degree in Computer Science. Ability to complete a 13-17 week full-time internship in the internship location starting in either May, June or July 2027.',
+    locations: ['Munich, Germany'],
+    countries: ['DE'],
+  };
+  const a = analyze(job);
+  assert.equal(a.verdict, 'possible');
+  assert.equal(a.criteria.start.label, 'Starts May, June or July 2027');
+  assert.equal(a.criteria.start.status, 'warn');
+  assert.equal(a.criteria.duration.status, 'warn');
+  assert.equal(analyze({ ...job, source: 'greenhouse' }).verdict, 'excluded');
+});
+
+test('Egypt / Saudi Arabia internships (internship only)', async () => {
+  const { detectSaudiOnly } = await import('../src/classify.js');
+  const desc = 'Software engineering internship starting January 2027 for 6 months. Open to bachelor students in computer science.';
+  const run = (locations, extra = '', title = 'Software Engineering Intern') =>
+    analyze({ title, description: desc + ' ' + extra, locations, postedAt: '2026-10-01' }).criteria.location;
+  assert.equal(run(['Cairo, Egypt']).status, 'pass');
+  assert.equal(run(['New Cairo, Cairo Governorate, Egypt']).label, 'Cairo, Egypt');
+  assert.equal(run(['Smart Village, Giza, Egypt']).status, 'pass');
+  assert.equal(run(['Alexandria, Egypt']).status, 'fail');
+  assert.equal(run(['Egypt']).status, 'warn');
+  assert.equal(run(['Jeddah, Saudi Arabia']).status, 'pass');
+  assert.equal(run(['Thuwal, Makkah Province, KSA']).status, 'pass');
+  assert.equal(run(['Riyadh, Saudi Arabia']).status, 'warn');
+  assert.equal(run(['Jeddah, Saudi Arabia'], 'This position is open to Saudi nationals only.').status, 'fail');
+  assert.equal(run(['Riyadh, KSA'], 'Applicants must be Saudi.').label, 'Saudi nationals only');
+  assert.equal(run(['Jeddah, Saudi Arabia'], 'Offered through the Tamheer program.').status, 'fail');
+  assert.equal(run(['Jeddah, Saudi Arabia'], 'Saudi nationals can join via Tamheer; non-Saudi students are also welcome.').status, 'pass');
+  assert.equal(detectSaudiOnly('We welcome Saudi and international students.'), '');
+  // Egypt / Saudi Arabia never qualify for working-student roles.
+  const ws = analyze({ title: 'Working Student Software Engineering', description: 'Bachelor students welcome, start November 2026.', locations: ['Cairo, Egypt'] });
+  assert.equal(ws.verdict, 'excluded');
+  assert.equal(ws.criteria.location.status, 'fail');
+  // Scheduler pre-filter keeps EG/SA but still drops other non-European locations.
+  assert.equal(resolveLocation(['Cairo, Egypt']).outOfScope, false);
+  assert.equal(resolveLocation(['Riyadh, Saudi Arabia']).outOfScope, false);
+  assert.equal(resolveLocation(['Bangalore, India']).outOfScope, true);
+});
+
+test('disability-only programmes and Wuzzuf locations', async () => {
+  const { detectDisabilityOnly } = await import('../src/classify.js');
+  const desc = 'Software engineering internship starting January 2027 for 6 months. Open to bachelor students in computer science.';
+  const ms = analyze({
+    title: 'Software Engineering Intern - Ignite Program',
+    description: desc + ' This program is designed for people with disabilities; only individuals with disabilities are eligible to apply.',
+    locations: ['Cairo, Egypt'],
+  });
+  assert.equal(ms.verdict, 'excluded');
+  assert.ok(ms.reasons.some((r) => /disabilities/.test(r)));
+  assert.equal(detectDisabilityOnly('Software Intern', 'We are an equal opportunity employer and welcome applicants with disabilities.'), '');
+  assert.equal(detectDisabilityOnly('Software Intern', 'Reasonable accommodations are available for individuals with disabilities.'), '');
+  const loc = (l) => analyze({ title: 'Software Engineering Intern', description: desc, locations: [l] }).criteria.location.status;
+  assert.equal(loc('Zagazig, Sharqia, Egypt'), 'fail');
+  assert.equal(loc('Port Said, Egypt'), 'fail');
+  assert.equal(loc('New Cairo, Cairo, Egypt'), 'pass');
+});

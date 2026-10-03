@@ -15,6 +15,12 @@ export const criteria = {
     preferredMonths: 5,
     // Germany / Switzerland preferred, rest of Europe accepted.
     preferredCountries: ['DE', 'CH'],
+    // Internships only (never working-student roles): Cairo area in Egypt, and Saudi Arabia with Jeddah preferred.
+    // Saudi postings restricted to Saudi nationals (e.g. Tamheer-only) are excluded. See evaluateLocation in classify.js.
+    extraCountries: ['EG', 'SA'],
+    // Sources whose internships are listed even when start / duration miss the target
+    // (shown as "Possible" with the posting's own dates). Google's 2027 roles are 13–17 week summer internships.
+    relaxTimingSources: ['google'],
   },
   // Score threshold (0–100) for a "Strong match".
   strongScore: 72,
@@ -38,6 +44,7 @@ export const greenhouse = {
   samsara: 'Samsara', wise: 'Wise', solarisbank: 'Solaris', neuralink: 'Neuralink', trivago: 'trivago', xai: 'xAI',
   jetbrains: 'JetBrains', helsing: 'Helsing', sumup: 'SumUp', coinbase: 'Coinbase', gocardless: 'GoCardless',
   monzo: 'Monzo', asana: 'Asana', waymo: 'Waymo', onrunning: 'On', robinhood: 'Robinhood', affirm: 'Affirm',
+  tamara: 'Tamara',
 };
 
 export const lever = {
@@ -51,7 +58,7 @@ export const ashby = {
   synthesia: 'Synthesia', runway: 'Runway', character: 'Character.AI', supabase: 'Supabase', writer: 'Writer',
   replit: 'Replit', cognition: 'Cognition', cohere: 'Cohere', elevenlabs: 'ElevenLabs', lovable: 'Lovable',
   clickhouse: 'ClickHouse', notion: 'Notion', ramp: 'Ramp', perplexity: 'Perplexity', 'neko-health': 'Neko Health',
-  harvey: 'Harvey', openai: 'OpenAI',
+  harvey: 'Harvey', openai: 'OpenAI', thndr: 'Thndr',
 };
 
 export const smartrecruiters = {
@@ -92,7 +99,10 @@ export const personio = {
   instagrid: 'instagrid', ottonova: 'ottonova', personio: 'Personio', '1komma5grad': '1KOMMA5°', thermondo: 'thermondo',
 };
 
-export const workable = { huggingface: 'Hugging Face' };
+// Hugging Face, plus Cairo / Saudi tech companies (Foodics, Salla, Lucidya, Robusta).
+export const workable = {
+  huggingface: 'Hugging Face', foodics: 'Foodics', salla: 'Salla', lucidya: 'Lucidya', robusta: 'Robusta',
+};
 
 // Germany-wide public job board of the Federal Employment Agency — mirrors postings of SAP, Siemens,
 // BMW, Mercedes, Allianz, Telekom, Infineon etc. that don't expose their own APIs.
@@ -113,3 +123,6 @@ export const jobsChQueries = [
   'internship software', 'internship machine learning', 'internship ai', 'internship security',
   'praktikum cyber security', 'praktikum ki',
 ];
+
+// Wuzzuf (Egypt + Saudi Arabia). Full-text search; the classifier filters by field and city afterwards.
+export const wuzzufQueries = ['intern', 'internship', 'trainee'];

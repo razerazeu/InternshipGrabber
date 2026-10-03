@@ -181,10 +181,13 @@ export const eightfold = {
   label: 'Microsoft & Qualcomm careers',
   async list(ctx) {
     const seen = new Map();
-    const tasks = cfg.eightfold.flatMap((c) => EF_QUERIES.map((q) => [c, q]));
-    await mapLimit(tasks, 3, async ([c, q]) => {
+    const tasks = cfg.eightfold.flatMap((c) => [
+      ...EF_QUERIES.map((q) => [c, q, '']),
+      ...['Egypt', 'Saudi Arabia'].flatMap((l) => ['intern', 'internship'].map((q) => [c, q, l])),
+    ]);
+    await mapLimit(tasks, 3, async ([c, q, l]) => {
       for (let start = 0; start < 400; start += 10) {
-        const d = await http(`https://${c.host}/api/pcsx/search?domain=${c.domain}&query=${encodeURIComponent(q)}&location=&start=${start}&sort_by=timestamp`);
+        const d = await http(`https://${c.host}/api/pcsx/search?domain=${c.domain}&query=${encodeURIComponent(q)}&location=${encodeURIComponent(l)}&start=${start}&sort_by=timestamp`);
         const ps = d.data?.positions || [];
         for (const p of ps) {
           const id = `${c.domain}:${p.id}`;
@@ -202,7 +205,7 @@ export const eightfold = {
         }
         if (ps.length < 10 || start + 10 >= (d.data?.count ?? 0)) break;
       }
-    }, (e, [c, q]) => ctx.warn(`eightfold/${c.domain} "${q}": ${e.message}`));
+    }, (e, [c, q, l]) => ctx.warn(`eightfold/${c.domain} "${q}"${l ? ` ${l}` : ''}: ${e.message}`));
     return [...seen.values()];
   },
   async detail(raw) {
