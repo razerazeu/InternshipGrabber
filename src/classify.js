@@ -285,8 +285,8 @@ const toNum = (s) => (/^\d+$/.test(s) ? Number(s) : NUM_WORDS[s.toLowerCase()]);
 const MONTH_UNIT = `(?:months?|monate?n?|monats?|mois|mesi|meses|mo\\.)`;
 const WEEK_UNIT = `(?:weeks?|wochen|semaines|settimane|semanas)`;
 const DUR_SKIP_AFTER = /^\W{0,3}(?:of\s+|an\s+)?(?:\w+\s+){0,2}(experience|erfahrung|berufserfahrung|old|ago|notice|kündigung|probation|probezeit|after|nach\s+(?:start|beginn)|onboarding|einarbeitung|training|elternzeit|parental)/i;
-const DUR_SKIP_BEFORE = /(within|innerhalb|after|nach|every|alle|last|letzten|first|ersten|ago|experience|erfahrung|vor|older|probation|probezeit|notice|kündigungsfrist|parental|elternzeit|onboarding|einarbeitung)\W*(?:\w+\W+){0,2}$/i;
-const DUR_CONTEXT = /(intern|praktik|duration|dauer|laufzeit|zeitraum|period|length|länge|for\s+(?:a|at\s+least|a\s+minimum|min)|für|of|von|mindestens|minimum|at\s+least|min\.|stage|tirocinio|werkstudent|commit)/i;
+const DUR_SKIP_BEFORE = /(within|innerhalb|after|nach|every|alle|\blast\b(?!\s+(?:for|about|around|approximately|approx\.?)\b)|letzten|first|ersten|ago|experience|erfahrung|vor|older|probation|probezeit|notice|kündigungsfrist|parental|elternzeit|onboarding|einarbeitung)\W*(?:\w+\W+){0,2}$/i;
+const DUR_CONTEXT = /(intern|praktik|duration|dauer|lasts?|lasting|runs?\s+for|spans?|laufzeit|zeitraum|period|length|länge|for\s+(?:a|at\s+least|a\s+minimum|min)|für|of|von|mindestens|minimum|at\s+least|min\.|stage|tirocinio|werkstudent|commit)/i;
 
 export function extractDuration(text = '', title = '') {
   const full = `${title}\n${text}`;
@@ -325,7 +325,7 @@ export function extractDuration(text = '', title = '') {
     while ((m = singleRe.exec(full))) {
       if (found.some((f) => m.index >= f.index && m.index < f.index + f.raw.length)) continue;
       const before = full.slice(Math.max(0, m.index - 4), m.index);
-      if (/[-–—+]\s*$|(?:to|bis|or|oder)\s$/i.test(before)) continue;
+      if (/[-–—+]\s*$|\b(?:to|bis|or|oder)\s$/i.test(before)) continue;
       const n = toNum(m[1]);
       push(n, n, m[0], m.index, u);
     }
@@ -343,7 +343,7 @@ export function extractDuration(text = '', title = '') {
 // ---------------------------------------------------------------- degree
 const BACHELOR_RE =
   /\b(bachelor(?:'s|s|’s)?|bachelorstud\w*|bachelorand\w*|b\.\s?sc\.?|bsc|b\.\s?eng\.?|beng|b\.\s?tech|btech|undergrad(?:uate)?s?|vordiplom|all\s+(?:degree\s+)?levels|any\s+(?:degree\s+)?level|any\s+year\s+of\s+study|alle\s+semester|bachelor-?\s*(?:oder|or|\/)\s*master)\b/i;
-const BACHELOR_CS = /\b(BS\/MS|BA\/BS|BS\/BA|BS\s+(?:or|\/)\s+MS|B\.S\.|BS\s+(?:degree|student|candidate)s?)\b/;
+const BACHELOR_CS = /\b(BS\/MS|BA\/BS|BS\/BA|BS\s+(?:or|\/)\s+MS|B\.S\.|BS\s+(?:degree|student|candidate)s?|BS\s+in\s+[A-Z]\w*)\b/;
 const MASTER_RE =
   /\b(master(?:'s|s|’s)?\s*(?:student|degree|program\w*|studies|studium|studiengang|level|candidate|of\s+science)s?|masterstud\w*|im\s+master|enrolled\s+in\s+(?:a|an|your)\s+master\w*|m\.\s?sc\.?|msc)\b/i;
 const MASTER_CS = /\b(MS\s+(?:students?|degree|program|Intern)|MS\/PhD|MSc)\b/;

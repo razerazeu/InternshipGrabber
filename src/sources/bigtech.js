@@ -54,10 +54,12 @@ export const google = {
   label: 'Google Careers',
   async list(ctx) {
     const seen = new Map();
-    for (const loc of ['Europe', 'Germany', 'Switzerland']) {
+    // Student Researcher roles are often listed outside the INTERN type and have flexible (5+ month) durations.
+    const queries = ['employment_type=INTERN', `q=${encodeURIComponent('"Student Researcher"')}`];
+    for (const query of queries) for (const loc of ['Europe', 'Germany', 'Switzerland']) {
       for (let page = 1; page <= 10; page++) {
         const html = await http(
-          `https://www.google.com/about/careers/applications/jobs/results/?employment_type=INTERN&location=${encodeURIComponent(loc)}&page=${page}`,
+          `https://www.google.com/about/careers/applications/jobs/results/?${query}&location=${encodeURIComponent(loc)}&page=${page}`,
           { as: 'text' },
         );
         const d = parseGoogle(html);

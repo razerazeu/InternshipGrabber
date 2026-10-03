@@ -137,3 +137,15 @@ test('end-to-end: working student Zurich vs Basel', () => {
 function pick(d) {
   return d ? [d.min, d.max] : null;
 }
+
+test('Google careers wording', () => {
+  const g = extractDuration('Ability to complete a 13-17 week full-time internship in Germany starting in either May, June or July 2027.');
+  assert.equal(g.min, 3);
+  assert.equal(g.max, 4);
+  assert.equal(extractDuration('Ability to complete a minimum 26 week internship starting in early 2027.').min, 6);
+  assert.equal(extractDuration('The internship lasts 5 months and starts in February 2027.').min, 5);
+  assert.equal(extractDuration('The internship will last for 6 months.').min, 6);
+  assert.equal(extractDuration('Internship for 5 months in Munich.').min, 5);
+  assert.equal(extractDuration('Projects shipped in the last 3 months'), null);
+  assert.equal(evaluateDegree('Student Researcher', 'Currently pursuing a BS in Computer Science or related field.').status, 'pass');
+});

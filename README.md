@@ -50,7 +50,7 @@ The interface is based on the Figma file [Internship Grabber - UI](https://www.f
 
 | Source | Covers |
 |---|---|
-| Google Careers | Google internships in Europe |
+| Google Careers | Google internships and Student Researcher roles in Europe |
 | Apple Jobs | Apple internships in 15 European countries, plus Werkstudent roles in Germany |
 | Amazon Jobs | Amazon / AWS in Germany, Switzerland and 15 other European countries |
 | Microsoft & Qualcomm (Eightfold) | Microsoft and Qualcomm careers sites |
@@ -90,4 +90,4 @@ The icon itself comes from Google's favicon service, with DuckDuckGo as a fallba
 - **SAP, Siemens and Meta** don't offer a public jobs API, so their postings come in through the Bundesagentur board (SAP and Siemens) or aren't covered (Meta).
 - **LinkedIn and Indeed** are deliberately not scraped because their terms of service don't allow it.
 - **Rule-based classification:** the classifier uses rules, not a language model. When a posting doesn't state something, it is marked "?" instead of guessed.
-- **Google internships:** Google's European internships are 12–14 week summer roles, so they are correctly excluded under these criteria.
+- **Google internships:** Google's 2027 European internships (checked October 2026) all require 13–17 weeks (about 3–4 months) starting in May, June or July 2027, so they are excluded under these criteria. Google's 26-week (6-month) internships starting March–May 2027 are only offered in Israel. The Google source also searches for "Student Researcher" roles, which usually have flexible start dates and durations, so those are picked up when Google posts them.
