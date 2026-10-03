@@ -52,7 +52,7 @@ export class Scheduler extends EventEmitter {
       const candidates = [];
       for (const r of raw) {
         if (!r.title || !detectTypes(r.title, r.employmentType).types.length) continue;
-        if (resolveLocation(r.locations || [], r.countries || []).nonEuropeOnly) continue;
+        if (resolveLocation(r.locations || [], r.countries || []).outOfScope) continue;
         candidates.push(r);
       }
 

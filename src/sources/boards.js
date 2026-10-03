@@ -1,4 +1,4 @@
-// General job boards: Bundesagentur für Arbeit (all German employers), Arbeitnow, jobs.ch (Zurich).
+// General job boards: Bundesagentur für Arbeit (all German employers), Arbeitnow, jobs.ch (Zurich), Wuzzuf (Egypt / Saudi Arabia).
 import { http, mapLimit, htmlToText, toIso } from '../util.js';
 import * as cfg from '../config.js';
 
@@ -127,6 +127,69 @@ export const jobsch = {
     return text.length > (raw.description || '').length ? { description: text } : {};
   },
 };
+
+export const wuzzuf = {
+  key: 'wuzzuf',
+  label: 'Wuzzuf (Egypt & Saudi Arabia)',
+  async list(ctx) {
+    // Public JSON:API used by wuzzuf.net itself: search returns ids + company names, /api/job returns full postings.
+    const H = { Accept: 'application/vnd.api+json', 'Content-Type': 'application/vnd.api+json' };
+    const companies = new Map();
+    for (const q of cfg.wuzzufQueries) {
+      try {
+        for (let start = 0; start < 500; start += 50) {
+          const d = await http(`${WUZZUF}/api/search/job`, {
+            method: 'POST',
+            headers: H,
+            body: JSON.stringify({ startIndex: start, pageSize: 50, longitude: '0', latitude: '0', query: q, searchFilters: {} }),
+          });
+          for (const j of d.data || []) {
+            const name = j.attributes?.computedFields?.find((f) => f.name === 'company_name')?.value?.[0];
+            if (!companies.has(j.id)) companies.set(j.id, name || '');
+          }
+          if ((d.data || []).length < 50 || start + 50 >= (d.meta?.totalResultsCount ?? 0)) break;
+        }
+      } catch (e) {
+        ctx.warn(`wuzzuf "${q}": ${e.message}`);
+      }
+    }
+    const ids = [...companies.keys()];
+    const out = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      try {
+        const d = await http(`${WUZZUF}/api/job?filter[other][ids]=${ids.slice(i, i + 50).join(',')}`, { headers: H });
+        for (const j of d.data || []) {
+          const a = j.attributes || {};
+          if (a.status && a.status !== 'active') continue;
+          const l = a.location || {};
+          const level = a.careerLevel ? `Career level: ${a.careerLevel.name}${a.careerLevel.hint ? ` (${a.careerLevel.hint})` : ''}` : '';
+          out.push({
+            externalId: j.id,
+            company: a.hideCompany ? 'Confidential company' : companies.get(j.id) || 'Unknown',
+            title: (a.title || '').trim(),
+            url: `${WUZZUF}/${a.uri || `jobs/p/${a.slug}`}`,
+            locations: [[l.area?.name, l.city?.name, l.country?.name].filter(Boolean).join(', ')].filter(Boolean),
+            countries: [l.country?.code].filter(Boolean),
+            postedAt: wuzzufDate(a.postedAt),
+            employmentType: [a.jobType, ...(a.workTypes || []).map((w) => w.displayedName || w.name)].filter(Boolean).join(' '),
+            description: [htmlToText(a.description || ''), htmlToText(a.requirements || ''), level].filter(Boolean).join('\n\n'),
+            logoUrl: typeof a.logo === 'string' ? a.logo : null,
+          });
+        }
+      } catch (e) {
+        ctx.warn(`wuzzuf details: ${e.message}`);
+      }
+    }
+    return out;
+  },
+};
+
+const WUZZUF = 'https://wuzzuf.net';
+// "MM/DD/YYYY HH:mm:ss" in Cairo time.
+function wuzzufDate(s) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/.exec(s || '');
+  return m ? new Date(Date.UTC(+m[3], +m[1] - 1, +m[2], +m[4] - 3, +m[5])).toISOString() : null;
+}
 
 function longestString(obj, depth = 0) {
   let best = '';

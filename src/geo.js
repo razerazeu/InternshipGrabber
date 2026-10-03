@@ -12,8 +12,12 @@ export const COUNTRY_NAMES_EN = {
   NO: 'Norway', FI: 'Finland', IS: 'Iceland', PL: 'Poland', CZ: 'Czechia', SK: 'Slovakia', HU: 'Hungary',
   SI: 'Slovenia', HR: 'Croatia', RO: 'Romania', BG: 'Bulgaria', GR: 'Greece', EE: 'Estonia', LV: 'Latvia',
   LT: 'Lithuania', MT: 'Malta', CY: 'Cyprus', RS: 'Serbia', UA: 'Ukraine', US: 'United States', CA: 'Canada',
-  IN: 'India', CN: 'China', JP: 'Japan', SG: 'Singapore', AU: 'Australia', IL: 'Israel',
+  IN: 'India', CN: 'China', JP: 'Japan', SG: 'Singapore', AU: 'Australia', IL: 'Israel', EG: 'Egypt',
+  SA: 'Saudi Arabia', AE: 'United Arab Emirates',
 };
+
+// Non-European countries accepted for internships only (Cairo / Saudi Arabia, Jeddah preferred).
+export const MENA_EXTRA = new Set(['EG', 'SA']);
 
 const ISO3 = {
   DEU: 'DE', CHE: 'CH', AUT: 'AT', NLD: 'NL', BEL: 'BE', LUX: 'LU', FRA: 'FR', ITA: 'IT', ESP: 'ES', PRT: 'PT',
@@ -86,8 +90,9 @@ const COUNTRY_PATTERNS = [
   [/\bcosta rica\b/i, 'CR'],
   [/\bcolombia\b/i, 'CO'],
   [/\bchile\b/i, 'CL'],
-  [/\bsaudi arabia\b/i, 'SA'],
-  [/\begypt\b/i, 'EG'],
+  [/\b(saudi arabia|kingdom of saudi arabia|saudi-arabien|saudi)\b/i, 'SA'],
+  [/\bKSA\b/, 'SA'],
+  [/\b(egypt|ägypten|aegypten)\b/i, 'EG'],
   [/\bthailand\b/i, 'TH'],
 ];
 
@@ -155,12 +160,24 @@ const CITIES = {
   BR: 'são paulo sao paulo',
   SG: 'singapore',
   AE: 'dubai abu dhabi',
+  EG: `cairo new cairo giza 6th of october smart village nasr city maadi heliopolis sheikh zayed new administrative capital
+    alexandria mansoura tanta assiut sharqia zagazig gharbia dakahlia qalyubia monufia menoufia beheira damanhour
+    ismailia suez port said damietta minya sohag luxor aswan hurghada fayoum faiyum beni suef qena kafr el sheikh matrouh`,
+  SA: `jeddah jiddah jedda thuwal riyadh dammam khobar al khobar dhahran mecca makkah medina madinah neom tabuk jubail
+    yanbu`,
 };
 
 const ZURICH_AREA = new Set(
   `zurich zürich zuerich winterthur rüschlikon rueschlikon schlieren kloten opfikon glattbrugg wallisellen dübendorf
   duebendorf dietikon uster thalwil adliswil horgen regensdorf wädenswil waedenswil`.split(/\s+/).filter(Boolean),
 );
+// Greater Cairo (incl. Giza, New Cairo, 6th of October, Smart Village).
+const CAIRO_AREA = new Set([
+  'cairo', 'new cairo', 'giza', '6th of october', 'smart village', 'nasr city', 'maadi', 'heliopolis', 'sheikh zayed',
+  'new administrative capital',
+]);
+// Jeddah and KAUST in nearby Thuwal.
+const JEDDAH_AREA = new Set(['jeddah', 'jiddah', 'jedda', 'thuwal']);
 
 // Multi-word cities first so "san francisco" wins over "francisco" etc.
 const CITY_LIST = [];
@@ -169,12 +186,14 @@ for (const [cc, list] of Object.entries(CITIES)) {
   const multi = [
     'sophia antipolis', 'the hague', 'den haag', 'mountain view', 'san francisco', 'new york', 'santa clara',
     'palo alto', 'menlo park', 'los angeles', 'san jose', 'san diego', 'tel aviv', 'são paulo', 'sao paulo', 'novi sad',
-    'abu dhabi', 'st. gallen', 'foster city', 'san mateo', 'sankt augustin',
+    'abu dhabi', 'st. gallen', 'foster city', 'san mateo', 'sankt augustin', 'new cairo', '6th of october',
+    'smart village', 'nasr city', 'sheikh zayed', 'new administrative capital', 'al khobar', 'port said', 'beni suef',
+    'kafr el sheikh',
   ];
   const joined = ` ${tokens.join(' ')} `;
   for (const m of multi) if (joined.includes(` ${m} `)) CITY_LIST.push([m, cc]);
   for (const t of tokens) {
-    if (multi.some((m) => m.split(' ').includes(t))) continue;
+    if (multi.some((m) => m.split(' ').includes(t)) && !['cairo', 'khobar'].includes(t)) continue;
     CITY_LIST.push([t, cc]);
   }
 }
@@ -201,6 +220,8 @@ export function resolveLocation(locations = [], countryHints = []) {
   const countries = new Set();
   const cities = new Set();
   let zurich = false;
+  let cairo = false;
+  let jeddah = false;
   let remote = false;
   let europeHint = false;
 
@@ -231,6 +252,8 @@ export function resolveLocation(locations = [], countryHints = []) {
         countries.add(cc);
         cities.add(name);
         if (cc === 'CH' && ZURICH_AREA.has(name)) zurich = true;
+        if (cc === 'EG' && CAIRO_AREA.has(name)) cairo = true;
+        if (cc === 'SA' && JEDDAH_AREA.has(name)) jeddah = true;
         found = true;
         s = s.replace(re, '$1 ');
       }
@@ -240,15 +263,22 @@ export function resolveLocation(locations = [], countryHints = []) {
   if (/\b(zurich|zürich|zuerich)\b/i.test(locations.join(' '))) zurich = true;
 
   const list = [...countries];
+  const europe = list.some((c) => EUROPE.has(c));
   return {
     countries: list,
     cities: [...cities],
     zurich,
+    cairo,
+    jeddah,
     remote,
     europeHint,
     germany: countries.has('DE'),
     switzerland: countries.has('CH'),
-    europe: list.some((c) => EUROPE.has(c)),
-    nonEuropeOnly: list.length > 0 && !list.some((c) => EUROPE.has(c)) && !europeHint,
+    egypt: countries.has('EG'),
+    saudi: countries.has('SA'),
+    europe,
+    nonEuropeOnly: list.length > 0 && !europe && !europeHint,
+    // Nothing in a location that could ever match (Europe, or Egypt / Saudi Arabia for internships).
+    outOfScope: list.length > 0 && !europe && !europeHint && !list.some((c) => MENA_EXTRA.has(c)),
   };
 }

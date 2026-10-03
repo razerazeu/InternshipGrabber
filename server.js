@@ -169,7 +169,7 @@ const server = http.createServer(async (req, res) => {
     // static
     const file = path.join(ROOT, 'public', p === '/' ? 'index.html' : path.normalize(p).replace(/^([/\\])+/, ''));
     if (!file.startsWith(path.join(ROOT, 'public')) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return send(res, 404, { error: 'not found' });
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     fs.createReadStream(file).pipe(res);
   } catch (e) {
     console.error(e);

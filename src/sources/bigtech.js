@@ -1,14 +1,14 @@
 // Big-tech career sites with their own (public, unauthenticated) endpoints.
 import { http, mapLimit, htmlToText, toIso, extractJsonLiteral } from '../util.js';
 
-const AMAZON_EU = ['DEU', 'CHE', 'GBR', 'FRA', 'ITA', 'ESP', 'NLD', 'IRL', 'POL', 'LUX', 'SWE', 'AUT', 'BEL', 'DNK', 'FIN', 'CZE', 'ROU'];
+const AMAZON_EU = ['DEU', 'CHE', 'GBR', 'FRA', 'ITA', 'ESP', 'NLD', 'IRL', 'POL', 'LUX', 'SWE', 'AUT', 'BEL', 'DNK', 'FIN', 'CZE', 'ROU', 'EGY', 'SAU'];
 export const amazon = {
   key: 'amazon',
   label: 'Amazon Jobs',
   async list(ctx) {
     const seen = new Map();
     const tasks = AMAZON_EU.flatMap((c) =>
-      (c === 'DEU' || c === 'CHE' ? ['intern', 'internship', 'working student', 'werkstudent', 'praktikum'] : ['intern']).map((q) => [c, q]),
+      (c === 'DEU' || c === 'CHE' ? ['intern', 'internship', 'working student', 'werkstudent', 'praktikum'] : c === 'EGY' || c === 'SAU' ? ['intern', 'internship'] : ['intern']).map((q) => [c, q]),
     );
     await mapLimit(tasks, 4, async ([country, q]) => {
       for (let offset = 0; offset < 500; offset += 100) {
@@ -56,7 +56,7 @@ export const google = {
     const seen = new Map();
     // Student Researcher roles are often listed outside the INTERN type and have flexible (5+ month) durations.
     const queries = ['employment_type=INTERN', `q=${encodeURIComponent('"Student Researcher"')}`];
-    for (const query of queries) for (const loc of ['Europe', 'Germany', 'Switzerland']) {
+    for (const query of queries) for (const loc of ['Europe', 'Germany', 'Switzerland', 'Egypt', 'Saudi Arabia']) {
       for (let page = 1; page <= 10; page++) {
         const html = await http(
           `https://www.google.com/about/careers/applications/jobs/results/?${query}&location=${encodeURIComponent(loc)}&page=${page}`,

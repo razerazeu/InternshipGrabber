@@ -391,7 +391,55 @@ export function evaluateDegree(title = '', text = '', type = 'internship') {
 }
 
 // ---------------------------------------------------------------- evaluation
-function evaluateLocation(loc, type, raw) {
+// Postings restricted to Saudi nationals (e.g. Tamheer, Saudization roles). Returns the evidence snippet or ''.
+const SAUDI_ONLY = [
+  /\bsaudi\s+(?:nationals?|citizens?|nationality)\s*(?:\(\s*)?only\b/i,
+  /\bonly\s+(?:open\s+to\s+|for\s+|available\s+(?:to|for)\s+|eligible\s+(?:to|for)\s+)?saudi\s+(?:nationals?|citizens?|students|graduates)\b/i,
+  /\b(?:open|available|restricted|limited|exclusive(?:ly)?)\s+(?:only\s+)?(?:to|for)\s+saudi\s+(?:nationals?|citizens?|students|graduates)\b(?!\s+(?:and|or|&)\s+(?:non-?saudi|residents?|expat|international))/i,
+  /\b(?:must|should|need\s+to|required\s+to)\s+be\s+(?:a\s+)?saudi\b/i,
+  /\bsaudi\s+nationality\s+(?:is\s+)?(?:required|mandatory|a\s+must)\b/i,
+  /\b(?:applicants?|candidates?)\s+must\s+hold\s+saudi\s+(?:nationality|citizenship)\b/i,
+  /\bsaudi(?:s|zation|isation)\s+only\b/i,
+  /\bsaudization\s+(?:role|position|program)\b/i,
+  /(?:للسعوديين|سعوديين|السعوديين)\s*فقط/,
+];
+const TAMHEER = /\btamheer\b|تمهير/i;
+const NON_SAUDI_OK = /\b(?:non-?saudis?|all\s+nationalities|international\s+(?:students|applicants|candidates)|expats?)\b(?!\s+(?:are\s+)?(?:not|ineligible))/i;
+
+export function detectSaudiOnly(text) {
+  if (!text) return '';
+  for (const re of SAUDI_ONLY) {
+    const m = text.match(re);
+    if (m) return snippet(text, m.index, m[0].length);
+  }
+  // Tamheer is the HRDF on-the-job programme for Saudi nationals; count it unless non-Saudis are also invited.
+  const t = text.match(TAMHEER);
+  if (t && !NON_SAUDI_OK.test(text)) return snippet(text, t.index, t[0].length);
+  return '';
+}
+
+// Programmes open only to people with disabilities (e.g. Microsoft "Ignite"). Ordinary EEO /
+// accommodation statements mention disability too, so the text needs explicit "only / eligible" wording.
+const PWD = String.raw`(?:people|persons|individuals|candidates|applicants|students|graduates)\s+with\s+(?:a\s+)?disabilit(?:y|ies)`;
+const DISABILITY_ONLY_TITLE = new RegExp(String.raw`\bfor\s+${PWD}|\bpwds?\b`, 'i');
+const DISABILITY_ONLY_TEXT = [
+  new RegExp(String.raw`\bonly\s+${PWD}\s+(?:are|is)\s+eligible`, 'i'),
+  new RegExp(String.raw`\b(?:exclusively|only|solely|specifically)\s+(?:for|to|open\s+to|available\s+to)\s+${PWD}`, 'i'),
+  new RegExp(String.raw`\b(?:open|available|restricted|limited)\s+(?:only|exclusively)\s+to\s+${PWD}`, 'i'),
+  /\b(?:applicants?|candidates?)\s+must\s+(?:have|identify\s+as\s+having)\s+a\s+(?:registered\s+|documented\s+)?disability\b/i,
+];
+
+export function detectDisabilityOnly(title = '', text = '') {
+  const t = title.match(DISABILITY_ONLY_TITLE);
+  if (t) return snippet(title, t.index, t[0].length);
+  for (const re of DISABILITY_ONLY_TEXT) {
+    const m = text.match(re);
+    if (m) return snippet(text, m.index, m[0].length);
+  }
+  return '';
+}
+
+function evaluateLocation(loc, type, raw, saudiOnly = '', extra = ['EG', 'SA']) {
   const label = loc.countries.length ? loc.countries.map((c) => COUNTRY_NAMES_EN[c] || c).join(', ') : raw.join('; ') || 'Unknown';
   if (type === 'working_student') {
     if (loc.germany) return { status: 'pass', label: loc.zurich ? 'Germany / Zurich' : 'Germany', evidence: raw.join('; ') };
@@ -405,6 +453,16 @@ function evaluateLocation(loc, type, raw) {
   }
   if (loc.germany || loc.switzerland) return { status: 'pass', label: [loc.germany && 'Germany', loc.switzerland && (loc.zurich ? 'Zurich' : 'Switzerland')].filter(Boolean).join(' / '), evidence: raw.join('; ') };
   if (loc.europe) return { status: 'warn', label: `${label} (Europe)`, evidence: raw.join('; ') };
+  const saudi = loc.saudi && extra.includes('SA');
+  const egypt = loc.egypt && extra.includes('EG');
+  if (saudi && saudiOnly) return { status: 'fail', label: 'Saudi nationals only', evidence: saudiOnly };
+  if (egypt && loc.cairo) return { status: 'pass', label: 'Cairo, Egypt', evidence: raw.join('; ') };
+  if (saudi && loc.jeddah) return { status: 'pass', label: 'Jeddah, Saudi Arabia', evidence: raw.join('; ') };
+  if (saudi) return { status: 'warn', label: loc.cities.length ? 'Saudi Arabia (not Jeddah)' : 'Saudi Arabia (city not stated)', evidence: raw.join('; ') };
+  if (egypt) {
+    if (!loc.cities.length) return { status: 'warn', label: 'Egypt (city not stated)', evidence: raw.join('; ') };
+    return { status: 'fail', label: 'Egypt, but not Cairo', evidence: raw.join('; ') };
+  }
   if (!loc.countries.length) {
     if (loc.europeHint) return { status: 'warn', label: 'Europe / EMEA', evidence: raw.join('; ') };
     return { status: 'unknown', label: 'Location not stated', evidence: '' };
@@ -517,7 +575,8 @@ export function analyze(job, crit = defaultCriteria) {
   const refDate = job.postedAt ? new Date(job.postedAt) : new Date();
   const start = extractStart(desc, title, refDate);
   const dur = extractDuration(desc, title);
-
+  const saudiOnly = loc.saudi ? detectSaudiOnly(full) : '';
+  const restricted = detectDisabilityOnly(title, desc);
   const base = {
     types,
     categories: cat.categories,
@@ -531,7 +590,7 @@ export function analyze(job, crit = defaultCriteria) {
 
   const evals = types.map((type) => {
     const c = {
-      location: evaluateLocation(loc, type, job.locations || []),
+      location: evaluateLocation(loc, type, job.locations || [], saudiOnly, crit.internship.extraCountries || []),
       start: evaluateStart(start, type, crit, full, job.startHint),
       degree: evaluateDegree(title, desc, type),
     };
@@ -541,6 +600,7 @@ export function analyze(job, crit = defaultCriteria) {
     if (relaxed) for (const k of ['start', 'duration']) if (c[k]?.status === 'fail') c[k] = { ...c[k], status: 'warn' };
     const reasons = [];
     if (!cat.categories.length) reasons.push(cat.negativeTitle ? 'Non-technical role' : 'Not ML / AI / Security / SWE');
+    if (restricted) reasons.push('Eligibility: only for people with disabilities');
     for (const [k, v] of Object.entries(c)) if (v.status === 'fail') reasons.push(`${k[0].toUpperCase()}${k.slice(1)}: ${v.label}`);
     const score = reasons.length ? 0 : scoreFor(type, c, cat.source, c.duration?.ideal);
     // The title must name the field for a "strong" match; description-only hits stay "possible".
