@@ -149,3 +149,19 @@ test('Google careers wording', () => {
   assert.equal(extractDuration('Projects shipped in the last 3 months'), null);
   assert.equal(evaluateDegree('Student Researcher', 'Currently pursuing a BS in Computer Science or related field.').status, 'pass');
 });
+
+test('Google internships are listed with their own dates', () => {
+  const job = {
+    source: 'google',
+    title: 'Software Engineering, Site Reliability Engineering BS/MS Intern, 2027',
+    description: 'Currently pursuing a BS/MS degree in Computer Science. Ability to complete a 13-17 week full-time internship in the internship location starting in either May, June or July 2027.',
+    locations: ['Munich, Germany'],
+    countries: ['DE'],
+  };
+  const a = analyze(job);
+  assert.equal(a.verdict, 'possible');
+  assert.equal(a.criteria.start.label, 'Starts May, June or July 2027');
+  assert.equal(a.criteria.start.status, 'warn');
+  assert.equal(a.criteria.duration.status, 'warn');
+  assert.equal(analyze({ ...job, source: 'greenhouse' }).verdict, 'excluded');
+});

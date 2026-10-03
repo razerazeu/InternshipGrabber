@@ -218,6 +218,16 @@ export function extractStart(text = '', title = '', refDate = new Date()) {
     if (months >= 1 && months <= 24) result.ranges.push({ months, raw: m[0], index: m.index });
     mask(m.index, m[0].length);
   }
+  // Month lists: "starting in either May, June or July 2027"
+  const listRe = new RegExp(`\\b((?:${M_ALT})(?:\\s*,\\s*(?:${M_ALT}))*\\s*,?\\s+(?:or|oder|and|und)\\s+(?:${M_ALT}))\\s+${YEAR}\\b`, 'gi');
+  while ((m = listRe.exec(full))) {
+    if (isMasked(m.index)) continue;
+    const y = yearNum(m[2]);
+    const months = m[1].split(/\s*,\s*|\s+(?:or|oder|and|und)\s+/i).map((w) => monthIdx(w.trim())).filter(Boolean);
+    if (months.length < 2 || y < 2025 || y > 2030 || NEG_CTX.test(clauseBefore(full, m.index))) continue;
+    result.seasons.push({ months: months.map((mo) => ({ y, m: mo })), raw: m[0], index: m.index });
+    mask(m.index, m[0].length);
+  }
 
   // 2) Single dates
   const addMention = (y, mo, idx, raw) => {
@@ -527,12 +537,15 @@ export function analyze(job, crit = defaultCriteria) {
     };
     if (type === 'internship') c.duration = evaluateDuration(dur, start, crit, full);
     else if (dur) c.duration = { status: 'info', label: dur.min === dur.max ? `${dur.min} months` : `${dur.min ?? '?'}–${dur.max ?? '…'} months`, evidence: snippet(full, dur.index, dur.raw.length) };
+    const relaxed = type === 'internship' && (crit.internship.relaxTimingSources || []).includes(job.source);
+    if (relaxed) for (const k of ['start', 'duration']) if (c[k]?.status === 'fail') c[k] = { ...c[k], status: 'warn' };
     const reasons = [];
     if (!cat.categories.length) reasons.push(cat.negativeTitle ? 'Non-technical role' : 'Not ML / AI / Security / SWE');
     for (const [k, v] of Object.entries(c)) if (v.status === 'fail') reasons.push(`${k[0].toUpperCase()}${k.slice(1)}: ${v.label}`);
     const score = reasons.length ? 0 : scoreFor(type, c, cat.source, c.duration?.ideal);
     // The title must name the field for a "strong" match; description-only hits stay "possible".
-    const verdict = reasons.length ? 'excluded' : score >= crit.strongScore && cat.source === 'title' ? 'strong' : 'possible';
+    const timingOff = relaxed && ['start', 'duration'].some((k) => c[k]?.status === 'warn');
+    const verdict = reasons.length ? 'excluded' : score >= crit.strongScore && cat.source === 'title' && !timingOff ? 'strong' : 'possible';
     return { type, criteria: c, reasons, score, verdict };
   });
   const order = { strong: 2, possible: 1, excluded: 0 };

@@ -15,6 +15,9 @@ export const criteria = {
     preferredMonths: 5,
     // Germany / Switzerland preferred, rest of Europe accepted.
     preferredCountries: ['DE', 'CH'],
+    // Sources whose internships are listed even when start / duration miss the target
+    // (shown as "Possible" with the posting's own dates). Google's 2027 roles are 13–17 week summer internships.
+    relaxTimingSources: ['google'],
   },
   // Score threshold (0–100) for a "Strong match".
   strongScore: 72,
