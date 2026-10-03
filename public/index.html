@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Internship Grabber</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Internship <em>grabber</em></h1>
+      <p>ML, AI, security and software roles for bachelor's students. Germany and Zurich first, then the rest of Europe.</p>
+    </div>
+    <div class="top-actions">
+      <span id="live" class="live" title="Live connection"><i></i><span>Connecting</span></span>
+      <span id="runinfo" class="mono muted"></span>
+      <button id="sourcesBtn" class="btn">Sources</button>
+      <button id="notify" class="btn" title="Desktop notifications for new matches">Notify me</button>
+      <button id="refresh" class="btn primary">Scan now</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="working_student" class="active">Working student <b data-count="working_student"></b></button>
+    <button data-tab="internship">Internship <b data-count="internship"></b></button>
+    <button data-tab="all">All roles <b data-count="all"></b></button>
+    <button data-tab="saved">Saved <b data-count="saved"></b></button>
+  </nav>
+
+  <div class="split">
+    <section class="col">
+      <div class="filters">
+        <div class="filter-row">
+          <label class="search">
+            <input id="q" type="search" placeholder="Search title, company or city" autocomplete="off" />
+            <kbd>/</kbd>
+          </label>
+          <select id="sort" aria-label="Sort">
+            <option value="found">Newest found</option>
+            <option value="posted">Newest posted</option>
+            <option value="score">Best match</option>
+          </select>
+        </div>
+        <div class="chips" id="cats"></div>
+        <div class="filter-row small-row">
+          <select id="region" aria-label="Region">
+            <option value="">All of Europe</option>
+            <option value="dach">Germany + Switzerland</option>
+            <option value="DE">Germany</option>
+            <option value="CH">Switzerland</option>
+            <option value="zurich">Zurich area</option>
+          </select>
+          <select id="verdict" aria-label="Match level">
+            <option value="strong">Strong only</option>
+            <option value="possible" selected>Strong + possible</option>
+            <option value="excluded">Include excluded</option>
+          </select>
+          <select id="posted" aria-label="Posted">
+            <option value="">Posted any time</option>
+            <option value="1">Last 24 hours</option>
+            <option value="3">Last 3 days</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+          <label class="check"><input type="checkbox" id="showStale" /> Possibly closed</label>
+          <label class="check"><input type="checkbox" id="showHidden" /> Hidden</label>
+        </div>
+        <div class="criteria" id="criteria"></div>
+      </div>
+      <div class="summary-row">
+        <div id="summary" class="mono"></div>
+        <div class="hint"><kbd>J</kbd><kbd>K</kbd> to move</div>
+      </div>
+      <div id="list" class="list" role="listbox" aria-label="Postings"></div>
+      <button id="more" class="btn more" hidden>Show more</button>
+    </section>
+
+    <aside id="pane" class="pane" aria-live="polite"></aside>
+  </div>
+
+  <aside id="sources" class="drawer" hidden>
+    <div class="drawer-head">
+      <h2>Sources</h2>
+      <button class="btn" id="closeSources">Close</button>
+    </div>
+    <div id="sourceList"></div>
+  </aside>
+
+  <div id="toasts" class="toasts"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
