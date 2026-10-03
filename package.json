@@ -1,0 +1,14 @@
+{
+  "name": "internship-grabber",
+  "version": "1.0.0",
+  "description": "Real-time tracker for ML / AI / Security / SWE internships and working-student roles in Germany, Switzerland and Europe.",
+  "type": "module",
+  "main": "server.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "once": "node server.js --once",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "license": "MIT"
+}
