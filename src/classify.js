@@ -363,20 +363,78 @@ const COMPLETED_BACHELOR =
 const STUDENT_GENERIC =
   /\b(enrolled|immatrikuliert|eingeschrieben|current(?:ly)?\s+(?:a\s+)?student|studierende\w*|student(?:in)?\s+(?:der|des|im|in|of)|studium\s+(?:der|des|im|in)|laufendes\s+studium|university\s+student|hochschulstud\w*|pursuing\s+(?:a|an|your)\s+(?:degree|studies)|degree\s+program\w*|studying|you\s+study|du\s+studierst|sie\s+studieren)\b/i;
 
+// The target is someone currently *pursuing* a Bachelor's. Each Bachelor mention is read in context to tell
+// "currently enrolled in a Bachelor's" (student) from "you hold a Bachelor's degree" (graduate).
+const STUDENT_CUE =
+  /\b(pursu\w*|ongoing|laufende[nrs]?|enrol\w*|immatrikul\w*|eingeschrieben\w*|current(?:ly)?\s+(?:a\s+)?(?:student|studying|attending|in)\b|studying|studierst|studieren|studierende\w*|student\w*|studium|studiengang\w*|(?:your|current|ongoing)\s+studies|semester\w*|working\s+towards?|in\s+progress|final[\s-]year|penultimate|(?:first|second|third|fourth|1st|2nd|3rd|4th|last)[\s-]year|befindest\s+dich|befinden\s+sich|bachelorand\w*|expected\s+graduat\w*|graduating|will\s+graduate|before\s+graduat\w*|vor\s+(?:dem|deinem|ihrem)\s+abschluss)\b/i;
+const GRAD_CUE =
+  /\b(complet\w*|finish\w*|hold\w*|possess\w*|obtain\w*|earned|attained|graduat\w*|have\s+(?:a|an)|has\s+(?:a|an)|you\s+have|degree\s+(?:is\s+)?(?:required|mandatory|a\s+must)|required\s+qualifications?|minimum\s+(?:of\s+)?(?:a|an)|at\s+least\s+(?:a|an)|abgeschlossen\w*|abschluss\w*|absolvent\w*|besitzt|besitzen|verfügst|verfügen|hast\s+(?:einen|ein)|haben\s+(?:einen|ein)|erworben\w*)\b|bachelor-?abschluss/i;
+// Posting-wide signals that the role targets graduates, used when no Bachelor mention settles it.
+const GRAD_WIDE = /\b(fresh\s+graduates?|recent(?:ly)?\s+graduat\w*|new\s+grads?|graduated|berufseinsteiger\w*|absolvent\w*|hochschulabsolvent\w*|bachelor-?abschluss)\b/i;
+const STUDENT_WIDE = /\b(students?|studierende\w*|studium|werkstudent\w*|pflichtpraktikum|immatrikul\w*|enrolled|undergraduates?|studying|pursuing|ongoing\s+(?:degree|studies))\b/i;
+// Sentence/bullet boundaries, ignoring abbreviations like "ggf." or "e.g.".
+const SEG_SPLIT = /[•\n;]|(?<!\b(?:ggf|bzw|bspw|evtl|inkl|usw|etc|ca|vs|nr|dr|incl|approx|z\.\s?b|e\.g|i\.e))[.!?]\s/i;
+
+function segmentBefore(full, i) {
+  const all = full.slice(Math.max(0, i - 160), i).split(SEG_SPLIT);
+  const last = all.pop() || '';
+  if (last.trim().length >= 25) return last;
+  // A bare bullet ("• Bachelor's degree in …") takes its context from the heading before it.
+  const prev = all.filter((p) => p && p.trim()).pop() || '';
+  return `${prev} ${last}`;
+}
+
+function classifyMention(full, m) {
+  const tok = m[0];
+  const end = m.index + tok.length;
+  const before = segmentBefore(full, m.index);
+  const after = full.slice(end, end + 90).split(SEG_SPLIT)[0];
+  // "Bachelor- oder Masterarbeit", "Bachelor's thesis", pay tables like "[Bachelor's degree] Romania: …" or "1.011 € (Bachelor)".
+  if (/^(?:'s|s|’s)?[\s\-–\/]*(?:(?:oder|or|und|and|&|\/)\s*)?(?:master(?:'s|’s)?)?[\s\-–\/]*(?:arbeit|thesis|theses)/i.test(after)) return 'none';
+  if (/[[(]\s*$/.test(before) && /^\s*[\])]/.test(after)) return 'none';
+  if (/^(bachelorstud|bachelorand|vordiplom|all\s|any\s|alle\s)/i.test(tok)) return 'student';
+  if (/^undergrad/i.test(tok) && !/^\s*(?:'s\s+)?degree/i.test(after)) return 'student';
+  const ctx = `${before} ${tok} ${after}`;
+  if (STUDENT_CUE.test(ctx)) return 'student';
+  if (GRAD_CUE.test(ctx)) return 'graduate';
+  return 'unclear';
+}
+
+const GRADUATE_LABEL = "Requires a completed Bachelor's (not for current students)";
+
 export function evaluateDegree(title = '', text = '', type = 'internship') {
   const full = `${title}\n${text}`;
   if (PHD_RE.test(title) && !BACHELOR_RE.test(title) && !BACHELOR_CS.test(title))
     return { status: 'fail', label: 'PhD-level position', evidence: title };
   if ((/\b(masters?|MS|MSc)\s+(intern|internship|student)/i.test(title) || /\bmasters\s+internships?\b/i.test(title)) && !BACHELOR_RE.test(title) && !BACHELOR_CS.test(title) && !/undergrad/i.test(title))
     return { status: 'fail', label: "Master's students only", evidence: title };
-  const b = full.match(BACHELOR_RE) || full.match(BACHELOR_CS);
   const completed = full.match(COMPLETED_BACHELOR);
   const ms = full.match(MASTER_RE) || full.match(MASTER_CS);
   const phd = full.match(PHD_RE);
-  if (completed && ms) {
+  // "Completed Bachelor's" + Master's => Master's-level role, unless it reads "currently pursuing or recently completed".
+  if (completed && ms && !STUDENT_CUE.test(segmentBefore(full, completed.index))) {
     return { status: 'fail', label: "Requires a completed Bachelor's (Master's level)", evidence: snippet(full, completed.index, completed[0].length) };
   }
-  if (b) return { status: 'pass', label: "Bachelor's students accepted", evidence: snippet(full, b.index, b[0].length) };
+  const mentions = { student: null, graduate: null, unclear: null };
+  const found = [...full.matchAll(new RegExp(BACHELOR_RE.source, 'gi')), ...full.matchAll(new RegExp(BACHELOR_CS.source, 'g'))].sort((a, b) => a.index - b.index);
+  for (const m of found) {
+    // A degree named in the title of an intern/student posting ("SWE BS/MS Intern") targets students.
+    const kind = m.index < title.length ? 'student' : classifyMention(full, m);
+    if (kind !== 'none') mentions[kind] ??= m;
+  }
+  const ev = (m) => snippet(full, m.index, m[0].length);
+  if (mentions.student) return { status: 'pass', label: "Current Bachelor's students accepted", evidence: ev(mentions.student) };
+  if (mentions.graduate) return { status: 'fail', graduateOnly: true, label: GRADUATE_LABEL, evidence: ev(mentions.graduate) };
+  const studentWide = full.match(STUDENT_WIDE);
+  const gradWide = full.match(GRAD_WIDE);
+  if (mentions.unclear) {
+    if (type === 'working_student') return { status: 'pass', label: "Bachelor's level; working-student roles require enrolment", evidence: ev(mentions.unclear) };
+    if (studentWide) return { status: 'pass', label: "Bachelor's students accepted", evidence: ev(mentions.unclear) };
+    if (gradWide) return { status: 'fail', graduateOnly: true, label: GRADUATE_LABEL, evidence: snippet(full, gradWide.index, gradWide[0].length) };
+    return { status: 'warn', label: "Bachelor's degree mentioned; unclear if current students qualify", evidence: ev(mentions.unclear) };
+  }
+  if (gradWide && !studentWide && type !== 'working_student')
+    return { status: 'fail', graduateOnly: true, label: 'For graduates (not current students)', evidence: snippet(full, gradWide.index, gradWide[0].length) };
   const higher = ms || phd;
   if (higher) {
     const before = full.slice(Math.max(0, higher.index - 80), higher.index);
@@ -605,11 +663,21 @@ export function analyze(job, crit = defaultCriteria) {
     const score = reasons.length ? 0 : scoreFor(type, c, cat.source, c.duration?.ideal);
     // The title must name the field for a "strong" match; description-only hits stay "possible".
     const timingOff = relaxed && ['start', 'duration'].some((k) => c[k]?.status === 'warn');
-    const verdict = reasons.length ? 'excluded' : score >= crit.strongScore && cat.source === 'title' && !timingOff ? 'strong' : 'possible';
-    return { type, criteria: c, reasons, score, verdict };
+    const verdictFor = (reasons, score) => (reasons.length ? 'excluded' : score >= crit.strongScore && cat.source === 'title' && !timingOff ? 'strong' : 'possible');
+    const verdict = verdictFor(reasons, score);
+    const ev = { type, criteria: c, reasons, score, verdict };
+    // Roles only for Bachelor's graduates are excluded by default; this is how they rank with the "graduates" filter on.
+    if (c.degree.graduateOnly) {
+      const gc = { ...c, degree: { ...c.degree, status: 'likely' } };
+      const gReasons = reasons.filter((r) => !r.startsWith('Degree:'));
+      const gScore = gReasons.length ? 0 : scoreFor(type, gc, cat.source, c.duration?.ideal);
+      ev.graduate = { criteria: gc, reasons: gReasons, score: gScore, verdict: verdictFor(gReasons, gScore) };
+    }
+    return ev;
   });
   const order = { strong: 2, possible: 1, excluded: 0 };
-  evals.sort((a, b) => order[b.verdict] - order[a.verdict] || b.score - a.score);
+  const alt = (e) => (e.graduate ? order[e.graduate.verdict] : -1);
+  evals.sort((a, b) => order[b.verdict] - order[a.verdict] || b.score - a.score || alt(b) - alt(a));
   const best = evals[0];
   return { ...base, ...best };
 }

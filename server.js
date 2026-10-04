@@ -51,7 +51,7 @@ function slim(job) {
 function listJobs(includeExcluded) {
   const byKey = new Map();
   for (const j of Object.values(store.jobs)) {
-    if (!includeExcluded && j.analysis?.verdict === 'excluded') continue;
+    if (!includeExcluded && j.analysis?.verdict === 'excluded' && (j.analysis.graduate?.verdict ?? 'excluded') === 'excluded') continue;
     const key = `${normTitle(j.title)}|${cityKey(j)}`;
     const clusters = byKey.get(key) || byKey.set(key, []).get(key);
     const toks = companyTokens(j.company);

@@ -19,7 +19,7 @@ marks are stored in `data/user.json`.
 | | Working student | Internship |
 |---|---|---|
 | Start | Oct 2026 – Jan 2027 (ASAP / flexible OK) | Jan / Feb 2027 (flexible OK; Dec/Mar shown as "close") |
-| Degree | Bachelor's students accepted | Bachelor's students accepted |
+| Degree | Currently pursuing a Bachelor's | Currently pursuing a Bachelor's |
 | Duration | – | At least 5 months (5 preferred, "5–6 months" etc. accepted) |
 | Location | Germany or Zurich area | Germany / Switzerland preferred, rest of Europe accepted. Also Cairo, Egypt and Saudi Arabia (Jeddah preferred) |
 
@@ -29,6 +29,8 @@ Egypt and Saudi Arabia apply to internships only:
 - **Region filter:** "All of Europe" hides roles located only in Egypt or Saudi Arabia; use the "Egypt" or "Saudi Arabia" region filter to see them.
 
 Programmes open only to people with disabilities (e.g. Microsoft's Ignite internships in Cairo) are excluded everywhere. General equal-opportunity statements don't trigger this.
+
+**Pursuing vs. holding a Bachelor's.** Each Bachelor mention is read in context. "Currently enrolled in a Bachelor's", "du befindest dich im Bachelorstudium" or "pursuing or recently completed" count as open to current students. "You have / hold a Bachelor's degree", "Du besitzt einen Bachelor-Abschluss", a bare "Bachelor's degree" under "Required qualifications", and fresh-graduate programmes count as graduate-only and are excluded by default. Use the **Degree** filter's "Also Bachelor's graduates" option to show them. Ambiguous wording such as "Bachelor's or Master's degree in CS" is kept and marked "Partial". Thesis offers and pay tables that mention "Bachelor" are ignored.
 
 Each criterion is checked separately. Select a posting in the list to see the results in the detail pane on the right, together with the text each result was based on and the full description. Each criterion is labelled:
 - **Met** or **Likely:** meets the criterion

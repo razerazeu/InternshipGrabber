@@ -211,3 +211,40 @@ test('disability-only programmes and Wuzzuf locations', async () => {
   assert.equal(loc('Port Said, Egypt'), 'fail');
   assert.equal(loc('New Cairo, Cairo, Egypt'), 'pass');
 });
+
+test('degree: pursuing vs. holding a Bachelor', () => {
+  const d = (text, type) => evaluateDegree('Intern Software Engineering', text, type);
+  assert.equal(d('Currently enrolled in a Bachelor\'s program in Computer Science').status, 'pass');
+  assert.equal(d('Du befindest dich im Bachelorstudium der Informatik').status, 'pass');
+  assert.equal(d('You are currently pursuing or have recently completed a Bachelor\'s or Master\'s degree in CS').status, 'pass');
+  assert.equal(d('Ongoing or recently completed degree (BSc or MSc) in Computer Science').status, 'pass');
+  for (const t of [
+    'About your profile\n• You have a Bachelor or Master degree in Computer Science',
+    'Du besitzt einen Bachelor-Abschluss in Informatik',
+    'Required qualifications:\n• Bachelor\'s degree in Computer Science',
+  ]) {
+    const r = d(t);
+    assert.equal(r.status, 'fail', t);
+    assert.equal(r.graduateOnly, true, t);
+  }
+  const fresh = d('This programme is for fresh graduates. Bachelor\'s degree in Computer Science');
+  assert.equal(fresh.graduateOnly, true);
+  assert.equal(d('Wir bieten auch Bachelor- oder Masterarbeiten an. Du studierst Informatik').status, 'likely');
+  assert.equal(d('Bachelor\'s or Master\'s degree in Computer Science').status, 'warn');
+});
+
+test('graduate-only roles get an alternative verdict', () => {
+  const job = {
+    title: 'Software Engineering Intern (6 months)',
+    company: 'Example AG',
+    location: 'Zurich, Switzerland',
+    description: 'Start: February 2027, duration 6 months.\nYour profile\n• You hold a Bachelor\'s degree in Computer Science',
+    postedAt: '2026-10-01',
+  };
+  const a = analyze(job);
+  assert.equal(a.verdict, 'excluded');
+  assert.ok(a.reasons.some((r) => r.startsWith('Degree:')));
+  assert.ok(a.graduate, 'graduate alternative present');
+  assert.notEqual(a.graduate.verdict, 'excluded');
+  assert.equal(a.graduate.criteria.degree.status, 'likely');
+});
