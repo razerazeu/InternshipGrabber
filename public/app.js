@@ -4,7 +4,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 const PREFS_KEY = 'ig.prefs';
 const prefs = Object.assign(
-  { tab: 'working_student', verdict: 'possible', region: '', posted: '', sort: 'found', cats: [], showStale: false, showHidden: false },
+  { tab: 'working_student', verdict: 'possible', region: '', posted: '', degree: '', sort: 'found', cats: [], showStale: false, showHidden: false },
   JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'),
 );
 const lastVisit = localStorage.getItem('ig.lastVisit') || new Date().toISOString();
@@ -58,10 +58,17 @@ document.addEventListener(
 );
 
 // ------------------------------------------------------------ data
+// Graduate-only roles carry an alternative evaluation that is used when "Also Bachelor's graduates" is selected.
+function applyDegree(j) {
+  j._base ??= j.analysis;
+  j.analysis = prefs.degree === 'graduate' && j._base.graduate ? { ...j._base, ...j._base.graduate } : j._base;
+  return j;
+}
+
 async function loadJobs() {
   const ex = prefs.verdict === 'excluded';
   const r = await fetch(`/api/jobs${ex ? '?excluded=1' : ''}`).then((r) => r.json());
-  state.jobs = r.jobs;
+  state.jobs = r.jobs.map(applyDegree);
   state.withExcluded = ex;
   indexLogos(state.jobs);
   render();
@@ -92,23 +99,24 @@ function renderCriteria(c) {
   const ws = c.workingStudent;
   const it = c.internship;
   $('#criteria').innerHTML = `
-    <div data-for="working_student"><b>Working student</b> starting ${ws.startFrom} to ${ws.startTo}, open to bachelor's students, in Germany or Zurich.</div>
-    <div data-for="internship"><b>Internship</b> starting ${it.targetStartMonths.join(' or ')}, at least ${it.minMonths} months (${it.preferredMonths} preferred), open to bachelor's students. Germany or Switzerland first, rest of Europe accepted. Also Cairo (Egypt) and Saudi Arabia (Jeddah preferred), excluding Saudi-nationals-only roles.</div>`;
+    <div data-for="working_student"><b>Working student</b> starting ${ws.startFrom} to ${ws.startTo},     open to students currently pursuing a Bachelor's, in Germany or Zurich.</div>
+        <div data-for="internship"><b>Internship</b> starting ${it.targetStartMonths.join(' or ')}, at least ${it.minMonths} months (${it.preferredMonths} preferred), open to students currently pursuing a Bachelor's. Germany or Switzerland first, rest of Europe accepted. Also Cairo (Egypt) and Saudi Arabia (Jeddah preferred), excluding Saudi-nationals-only roles.</div>`;
 }
 
 // ------------------------------------------------------------ filtering
-function filtered() {
+// Jobs matching every active filter for a given tab; the tab counts use the same rules as the list.
+function filtered(tab = prefs.tab, sorted = true) {
   const q = $('#q').value.trim().toLowerCase();
   const now = Date.now();
   const rank = { strong: 2, possible: 1, excluded: 0 };
   const minRank = { strong: 2, possible: 1, excluded: 0 }[prefs.verdict];
-  return state.jobs
+  const list = state.jobs
     .filter((j) => {
       const a = j.analysis;
-      if (prefs.tab === 'saved') {
+      if (tab === 'saved') {
         if (!['saved', 'applied'].includes(j.status)) return false;
       } else {
-        if (prefs.tab !== 'all' && a.type !== prefs.tab) return false;
+        if (tab !== 'all' && a.type !== tab) return false;
         if (rank[a.verdict] < minRank) return false;
         if (j.status === 'hidden' && !prefs.showHidden) return false;
         if (j.stale && !prefs.showStale) return false;
@@ -117,7 +125,7 @@ function filtered() {
       const cs = a.countries || [];
       if (!prefs.region) {
         // "All of Europe" leaves out roles located only in Egypt / Saudi Arabia; they have their own filters.
-        if (prefs.tab !== 'saved' && cs.length && cs.every((c) => c === 'EG' || c === 'SA')) return false;
+        if (tab !== 'saved' && cs.length && cs.every((c) => c === 'EG' || c === 'SA')) return false;
       } else {
         if (prefs.region === 'zurich' && !a.zurich) return false;
         if (prefs.region === 'dach' && !cs.some((c) => c === 'DE' || c === 'CH')) return false;
@@ -129,8 +137,9 @@ function filtered() {
       }
       if (q && !`${j.title} ${j.company} ${j.locations.join(' ')} ${j.sourceLabel}`.toLowerCase().includes(q)) return false;
       return true;
-    })
-    .sort((a, b) => {
+    });
+  if (!sorted) return list;
+  return list.sort((a, b) => {
       if (prefs.sort === 'score') return rank[b.analysis.verdict] - rank[a.analysis.verdict] || b.analysis.score - a.analysis.score;
       if (prefs.sort === 'posted') return (b.postedAt || b.firstSeenAt).localeCompare(a.postedAt || a.firstSeenAt);
       return b.firstSeenAt.localeCompare(a.firstSeenAt) || (b.postedAt || '').localeCompare(a.postedAt || '');
@@ -171,11 +180,8 @@ const isNew = (j) => state.live.has(j.id) || j.firstSeenAt > lastVisit;
 const jobById = (id) => state.jobs.find((j) => j.id === id);
 
 function render() {
-  const all = state.jobs;
-  const visible = (j) => j.analysis.verdict !== 'excluded' && j.status !== 'hidden' && !j.stale;
-  for (const t of ['working_student', 'internship']) $(`[data-count="${t}"]`).textContent = all.filter((j) => j.analysis.type === t && visible(j)).length;
-  $('[data-count="saved"]').textContent = all.filter((j) => ['saved', 'applied'].includes(j.status)).length || '';
-  $('[data-count="all"]').textContent = all.filter(visible).length;
+  for (const t of ['working_student', 'internship', 'all']) $(`[data-count="${t}"]`).textContent = filtered(t, false).length;
+  $('[data-count="saved"]').textContent = filtered('saved', false).length || '';
 
   const list = filtered();
   const newCount = list.filter(isNew).length;
@@ -361,11 +367,12 @@ function setTab(tab) {
   render();
 }
 
-for (const id of ['verdict', 'region', 'posted', 'sort', 'showStale', 'showHidden']) {
+for (const id of ['verdict', 'region', 'posted', 'degree', 'sort', 'showStale', 'showHidden']) {
   document.getElementById(id).addEventListener('change', (e) => {
     prefs[id] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     save();
     state.limit = 60;
+    if (id === 'degree') state.jobs.forEach(applyDegree);
     if (id === 'verdict' && (prefs.verdict === 'excluded') !== state.withExcluded) loadJobs();
     else render();
   });
@@ -497,16 +504,20 @@ function connect() {
     const jobs = JSON.parse(e.data);
     const known = new Set(state.jobs.map((j) => j.id));
     for (const j of jobs) {
-      state.live.add(j.id);
+      applyDegree(j);
       if (!known.has(j.id)) state.jobs.push(j);
     }
     indexLogos(jobs);
+    // Graduate-only roles are sent too; only announce them when the graduate filter is on.
+    const jobsShown = jobs.filter((j) => j.analysis.verdict !== 'excluded');
+    jobsShown.forEach((j) => state.live.add(j.id));
     render();
-    const strong = jobs.filter((j) => j.analysis.verdict === 'strong');
-    const msg = `${jobs.length} new match${jobs.length === 1 ? '' : 'es'}${strong.length ? ` (${strong.length} strong)` : ''}`;
-    toast(`${msg}: ${jobs.slice(0, 3).map((j) => `${j.company}, ${j.title}`).join('; ')}`);
+    if (!jobsShown.length) return;
+    const strong = jobsShown.filter((j) => j.analysis.verdict === 'strong');
+    const msg = `${jobsShown.length} new match${jobsShown.length === 1 ? '' : 'es'}${strong.length ? ` (${strong.length} strong)` : ''}`;
+    toast(`${msg}: ${jobsShown.slice(0, 3).map((j) => `${j.company}, ${j.title}`).join('; ')}`);
     if (prefs.notify && Notification.permission === 'granted') {
-      const n = new Notification(`Internship Grabber: ${msg}`, { body: jobs.slice(0, 4).map((j) => `${j.company}: ${j.title}`).join('\n'), tag: 'ig-new', icon: '/favicon.svg' });
+      const n = new Notification(`Internship Grabber: ${msg}`, { body: jobsShown.slice(0, 4).map((j) => `${j.company}: ${j.title}`).join('\n'), tag: 'ig-new', icon: '/favicon.svg' });
       n.onclick = () => window.focus();
     }
   });

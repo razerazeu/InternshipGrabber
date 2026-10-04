@@ -101,7 +101,7 @@ export class Scheduler extends EventEmitter {
 
         job.analysis = analyze(job, criteria);
         this.store.put(job);
-        if (!prev && !firstRun && job.analysis.verdict !== 'excluded') fresh.push(job);
+        if (!prev && !firstRun && (job.analysis.verdict !== 'excluded' || (job.analysis.graduate && job.analysis.graduate.verdict !== 'excluded'))) fresh.push(job);
       });
 
       Object.assign(meta, {
@@ -126,7 +126,7 @@ export class Scheduler extends EventEmitter {
   /** Skip expensive detail fetches when the list data alone already rules the posting out. */
   worthDetail(job) {
     const a = analyze(job, criteria);
-    if (a.verdict !== 'excluded') return true;
+    if (a.verdict !== 'excluded' || (a.graduate && a.graduate.verdict !== 'excluded')) return true;
     return !a.reasons.every((r) => /^(Location|Non-technical|Degree)/.test(r));
   }
 
